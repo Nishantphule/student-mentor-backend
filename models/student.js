@@ -5,7 +5,6 @@ const studentSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
-        minlength: 5
     },
     prevMentor: {
         type: mongoose.Schema.Types.ObjectId,
@@ -19,7 +18,7 @@ const studentSchema = new mongoose.Schema({
 
 studentSchema.set('toJSON', {
     transform: (document, returnedObject) => {
-        returnedObject.id = returnedObject._id.toString();
+        returnedObject.studentId = returnedObject._id.toString();
         delete returnedObject._id;
         delete returnedObject.__v;
     }

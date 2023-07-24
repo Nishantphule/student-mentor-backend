@@ -3,6 +3,7 @@ const mentorsRouter = require('express').Router();
 
 // import the model
 const Mentor = require('../models/mentor');
+const Student = require('../models/student');
 
 // endpoint to get all the mentors
 mentorsRouter.get('/', async (request, response) => {
@@ -10,7 +11,8 @@ mentorsRouter.get('/', async (request, response) => {
     response.json(mentors);
 });
 
-// fetches a single resource
+// get students for a particular mentor
+// get all mentors
 mentorsRouter.get('/:id', (request, response, next) => {
     const id = request.params.id;
     Mentor.findById(id).populate('students', { name: 1 })
@@ -23,63 +25,45 @@ mentorsRouter.get('/:id', (request, response, next) => {
         .catch(error => next(error));
 });
 
-// creates a new resource based on the request data
+// creates a new mentor
 mentorsRouter.post('/', async (request, response) => {
-    const mentor = new Mentor(request.body);
 
-    const savedMentor = await mentor.save()
-    response.status(201).json({ message: 'mentor created successfully', Mentor: savedMentor });
+    try {
+        const mentor = new Mentor(request.body);
+        const savedMentor = await mentor.save()
+
+        response.status(201).json({ message: 'mentor created successfully', Mentor: savedMentor });
+    } catch (error) {
+        response.status(500).json({ message: error })
+    }
 
 });
 
-// deletes a single resource
-mentorsRouter.delete('/:id', (request, response) => {
-    const id = request.params.id;
+// assign mentor to multiple students
+mentorsRouter.post('/assignMentor', async (request, response) => {
+    try {
+        const { studentIds, mentorId } = request.body;
 
-    Mentor.findByIdAndDelete(id)
-        .then((deletedmentor) => {
-            if (!deletedmentor) {
-                return response.status(404).json({ error: 'Mentor not found' });
-            }
-            response.status(204).json({ message: 'Mentor deleted successfully' });
+        studentIds.forEach(async (studentId) => {
+            const student = await Student.findById(studentId);
+
+            student.mentor = mentorId;
+
+            await student.save();
         })
-        .catch((error) => {
-            response.status(500).json({ error: 'Internal server error' });
-        });
-});
 
-// patch request to update the identified resource with the request data
-mentorsRouter.patch('/:id', (request, response) => {
-    const id = request.params.id;
-    const MentorToPatch = request.body;
+        const mentor = await Mentor.findById(mentorId);
 
-    Mentor.findByIdAndUpdate(id, MentorToPatch)
-        .then((updatedMentor) => {
-            if (!updatedMentor) {
-                return response.status(404).json({ error: 'Mentor not found' });
-            }
-            response.json(updatedMentor);
-        })
-        .catch((error) => {
-            response.status(500).json({ error: 'Internal server error' });
-        });
-});
+        mentor.students = mentor.students.concat(...studentIds);
 
-// put request to replace the entire identified resource with the request data
-mentorsRouter.put('/:id', (request, response) => {
-    const id = request.params.id;
-    const mentorToPut = request.body;
+        await mentor.save();
 
-    Mentor.findByIdAndUpdate(id, mentorToPut)
-        .then((updatedMentor) => {
-            if (!updatedMentor) {
-                return response.status(404).json({ error: 'Mentor not found' });
-            }
-            response.json(updatedMentor);
-        })
-        .catch((error) => {
-            response.status(500).json({ error: 'Internal server error' });
-        });
+        response.status(201).json({ message: 'Mentor assigned successfully' });
+
+    } catch (error) {
+        response.status(500).json({ message: error })
+    }
+
 });
 
 module.exports = mentorsRouter;

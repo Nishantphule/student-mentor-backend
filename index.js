@@ -33,7 +33,9 @@ const mentorsRouter = require('./controllers/mentors');
 
 // root end point: prints hello world as an HTML
 app.get('/', (request, response) => {
-    response.send('<h1> Welcome to Student Mentor Management! </h1>');
+    response.send(
+        `<h1> Welcome to Student Mentor Management! </h1>
+        `);
 });
 
 // fetches all resources in the collection

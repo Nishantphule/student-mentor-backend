@@ -7,92 +7,103 @@ const Mentor = require('../models/mentor');
 
 // endpoint to get all the Students
 studentsRouter.get('/', async (request, response) => {
-    await Student.find({}, {}).populate('mentor', { name: 1 })
-        .then((students) => {
-            response.json(students);
-        });
+    try {
+        await Student.find({}, {}).populate('mentor', { name: 1 }).populate("prevMentor", { name: 1 })
+            .then((students) => {
+                response.status(200).json(students);
+            });
+    } catch (error) {
+        response.status(500).json({ message: error })
+    }
 });
 
-// fetches a single resource
+
+// get previous assigned mentor for a student
 studentsRouter.get('/:id', (request, response, next) => {
     const id = request.params.id;
-    Student.findById(id)
+    Student.findById(id).populate('mentor', { name: 1 }).populate("prevMentor", { name: 1 })
         .then((student) => {
             if (!student) {
                 return response.status(404).json({ error: 'Student not found' });
             }
-            response.json(student);
+            response.json({ Name: student.name, previousMentor: student.prevMentor });
         })
         .catch(error => next(error));
 });
 
-// creates a new resource based on the request data
+
+// creates a new student
 studentsRouter.post('/', async (request, response, next) => {
-    const body = request.body;
-    
-    const mentor = await Mentor.findById(body.mentor);
+    try {
+        const student = new Student(request.body);
 
-    const student = new Student({
-        ...body,
-        mentor:mentor.id
-    });
+        const savedStudent = await student.save();
 
-    const savedStudent = await student.save();
-
-    mentor.students = mentor.students.concat(savedStudent._id)
-    await mentor.save();
-
-    response.status(201).json({ message: 'Student created successfully', student: savedStudent });
+        response.status(201).json({ message: 'Student created successfully', student: savedStudent });
+    } catch (error) {
+        response.status(500).json({ message: error })
+    }
 });
 
-// deletes a single resource
-studentsRouter.delete('/:id', (request, response) => {
-    const id = request.params.id;
 
-    Student.findByIdAndDelete(id)
-        .then((deletedStudent) => {
-            if (!deletedStudent) {
-                return response.status(404).json({ error: 'Student not found' });
-            }
-            response.status(204).json({ message: 'Student deleted successfully' });
-        })
-        .catch((error) => {
-            response.status(500).json({ error: 'Internal server error' });
-        });
-});
+// change mentor for a particular student
+studentsRouter.post('/changeMentor', async (request, response) => {
+    try {
 
-// patch request to update the identified resource with the request data
-studentsRouter.patch('/:id', (request, response) => {
-    const id = request.params.id;
-    const studentToPatch = request.body;
+        const { studentId, mentorId } = request.body;
 
-    Student.findByIdAndUpdate(id, studentToPatch)
-        .then((updatedStudent) => {
-            if (!updatedStudent) {
-                return response.status(404).json({ error: 'Student not found' });
-            }
-            response.json(updatedStudent);
-        })
-        .catch((error) => {
-            response.status(500).json({ error: 'Internal server error' });
-        });
-});
+        // change student mentor
+        const student = await Student.findById(studentId);
 
-// put request to replace the entire identified resource with the request data
-studentsRouter.put('/:id', (request, response) => {
-    const id = request.params.id;
-    const StudentToPut = request.body;
+        if (!student.mentor) {
 
-    Student.findByIdAndUpdate(id, StudentToPut)
-        .then((updatedStudent) => {
-            if (!updatedStudent) {
-                return response.status(404).json({ error: 'Student not found' });
-            }
-            response.json(updatedStudent);
-        })
-        .catch((error) => {
-            response.status(500).json({ error: 'Internal server error' });
-        });
+            student.mentor = mentorId;
+
+            const savedStudent = await student.save();
+
+            // add student in newly assigned mentors list
+            const newMentor = await Mentor.findById(savedStudent.mentor)
+
+            newMentor.students = newMentor.students.concat(studentId);
+
+            await newMentor.save();
+
+            response.status(200).json({ message: "Mentor Assigned successfully!" })
+
+        }
+        else if (student.mentor.toString() === mentorId) {
+            // if mentor you are trying to assign is already there
+            response.status(200).json({ message: "Mentor you are trying to change is already assigned!" })
+        }
+        else {
+            student.prevMentor = student.mentor;
+            student.mentor = mentorId;
+
+            const savedStudent = await student.save();
+
+
+            // change students list of previous mentor
+            const mentor = await Mentor.findById(savedStudent.prevMentor);
+            mentor.students = mentor.students.filter((student) => {
+                return student.toString() !== studentId;
+            })
+            await mentor.save();
+
+            // add student in newly assigned mentors list
+            const newMentor = await Mentor.findById(savedStudent.mentor)
+
+            newMentor.students = newMentor.students.concat(studentId);
+
+            await newMentor.save();
+
+            response.status(200).json({ message: "Mentor Changed successfully!" })
+        }
+
+
+    } catch (error) {
+        response.status(500).json({ message: error })
+    }
+
 });
 
 module.exports = studentsRouter;
