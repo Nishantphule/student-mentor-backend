@@ -19,7 +19,7 @@ studentsRouter.get('/', async (request, response) => {
 
 
 // get previous assigned mentor for a student
-studentsRouter.get('/:id', (request, response, next) => {
+studentsRouter.get('/prevMentor/:id', (request, response, next) => {
     const id = request.params.id;
     Student.findById(id).populate('mentor', { name: 1 }).populate("prevMentor", { name: 1 })
         .then((student) => {
